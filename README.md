@@ -1,6 +1,6 @@
 # scotyard
 
-FIXME: write description
+Let the computer control the detectives to catch Mr. X.
 
 ## Usage
 
