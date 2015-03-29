@@ -14,6 +14,9 @@
                             (assoc a key (conj (get a key) mit )))) 
                         {} )))
 
+(def start-cards #{13,26,29,34,50,53,91,94,103,112,117,132,138,141,155,174,197,198})
+
+
 (def black-ticket-edges {#{108 115} (list "X")
                          #{115 157} (list "X")
                          #{157 194} (list "X")
@@ -21,7 +24,7 @@
 
 (def symap-mrx (merge symap black-ticket-edges))
 
-(def underground-stations [1 13 46 67 74 79 89 93 111 128 140 153 163 185])
+(def underground-stations #{1 13 46 67 74 79 89 93 111 128 140 153 163 185})
 
 ;;"http://scotland-yard.cvs.sourceforge.net/viewvc/scotland-yard/scotland-yard/ScotlandYard/bin/SCOTPOS.txt?revision=1.1.1.1"
 (def sypos (->> "resources/pos.txt"                

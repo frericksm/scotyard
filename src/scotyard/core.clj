@@ -29,7 +29,8 @@
   (let [cleaned-mrx-ps (remove (set current-agent-pos) (set possible-mrx-positions))]
     (->> cleaned-mrx-ps
          (reduce (fn [a n] (into a (map/neighbours-for-mrx n transport))) #{})
-         (remove (set current-agent-pos)))))
+         (remove (set current-agent-pos))
+         (set))))
 
 (defn next-mrx-moves
   ([game transport]
