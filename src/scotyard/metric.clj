@@ -2,9 +2,23 @@
   (:require [scotyard.astar :as astar]
             [scotyard.map :as map]))
 
-(defn euclidic-dist [[x1 y1] [x2 y2]]
-  (Math/sqrt (+ (Math/pow (- y2 y1) 2)
-                (Math/pow (- x2 x1) 2))))
+(defn vector-add [v1 v2]
+  (->> (map (fn [a b] (+ a b)) v1 v2)
+       (vec)))
+
+(defn vector-scalar-mult [v1 s]
+  (->> (map (fn [a] (* a s)) v1)
+       (vec)))
+
+(defn euclidic-norm [v]
+  (->> (map (fn [a] (* a a)) v)
+       (apply +)
+       (Math/sqrt)))
+
+(defn euclidic-dist [v1 v2]
+  (->> (vector-scalar-mult v2 -1)
+       (vector-add v1)
+       (euclidic-norm)))
 
 (def ^{:doc "Enthält den maximalen euklidischen Abstand zweier Nachbarfelder"}
   max-dist-neighbours
