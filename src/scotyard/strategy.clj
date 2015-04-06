@@ -50,7 +50,7 @@
     (max-projection x)
     (max-norm x)))
 
-(defn messzahlen [game detective-id]
+(defn measure [game detective-id]
   (let [dm (distance-matrix game)]
     [(minmin dm)
      (minmax dm)
@@ -65,3 +65,13 @@
        (norm-projection x m/euclidic-norm 0)
        (first x))
      ]))
+
+(defn sort-measure-fn [v]
+  (reduce (fn [a k] (+ k (* 1000 a))) 0 v))
+
+(defn select-detective-move [game detective-id possible-moves]
+  (sort-by (fn [to] 
+             (as-> (move-detective game detective-id to) y
+               (measure y detective-id)
+               (sort-measure-fn y))) 
+           possible-moves))
