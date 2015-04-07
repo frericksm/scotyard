@@ -1,9 +1,12 @@
 (ns scotyard.game
   (:require [scotyard.metric :as m]
             [scotyard.map :as map]
+            [scotyard.strategy :as strat]
             [clojure.set :as set]))
 
 (def colors [:red :green :blue :yellow :black :purple :orange])
+
+(def reveal-in-round #{3 8 13 18})
 
 (defn make-detective 
   "Returns a map representing the value of a detective"
@@ -71,7 +74,7 @@
 (defn whos-turn? 
   "Returns keyword :mrx if it is Mr.X turn. Returns the color keyword of the next detective who is turn."
   [g]
-  (if (round-finished? g) (throw (IllegalStateException. "Round finished")))
+  ;(if (round-finished? g) (throw (IllegalStateException. "Round finished")))
   (if (not (->> g :mrx :moved?)) 
     :mrx
     (as-> (:detectives g) x
@@ -100,6 +103,16 @@
     [detective-index-or-color (nth (:detectives game) 
                                    detective-index-or-color )]))
 
+(defn mrx-has-to-reveal? [game]
+  (and (contains? reveal-in-round (:round game))
+       (->> game :mrx :moved?)
+       (not= 1 (->> game :mrx :positions count))))
+
+(defn check-mrx-revealed [game]
+  (if (mrx-has-to-reveal? game)
+    (throw (IllegalStateException. 
+            (str "First Mr. X has to reveal his current location")))))
+
 (defn check-mrx-responded [game]
   (if (not (->> game :mrx :responded?))
     (throw (IllegalStateException. 
@@ -124,11 +137,19 @@
     (if (empty? new-positions)
       (throw (IllegalArgumentException. "Illegal move")))))
 
+(defn check-mrx-arrested [game]
+  (let [safe-mr-positions (clojure.set/difference 
+                           (get-in game [:mrx :positions])
+                           (detective-positions game))]
+    (if (empty? safe-mr-positions)
+      (throw (IllegalArgumentException. "Game over. Mr. X is caught by one detective")))))
+
 (defn move-mrx 
   "Returns a new (value of the) game reflecting Mr. X moving around using the 'ticket'"
   [game ticket]
 
   ;; Checks
+  (check-mrx-arrested game)
   (check-mrx-responded game)
   (check-turn game :mrx)
   (check-mrx-transport game ticket)
@@ -140,7 +161,8 @@
                  (mrx-moves ticket 
                             (detective-positions game) 
                             positions)))
-    (assoc-in x [:mrx :moved?] true)))
+    (assoc-in x [:mrx :moved?] true)
+    (assoc-in x [:mrx :responded?] true)))
 
 (defn move-detective 
   ""
@@ -149,6 +171,8 @@
         to-reachable? (contains? (scotyard.map/neighbours-for-detective (:position detective))
                                  to)]
     ;; Checks
+    (check-mrx-arrested game)
+    (check-mrx-revealed game)
     (check-mrx-responded game)
     (check-turn game (:color detective))
     (check-reachable game (:position detective) to)
@@ -163,6 +187,7 @@
   [game]
   
 ;; Checks
+  (check-mrx-arrested game)
   (if-let [next-player (whos-turn? game)]
     (throw (IllegalStateException. 
             (format "Round cannot be finished since %s has to move" next-player))))
@@ -172,7 +197,9 @@
   (as-> game x
     (update-in x [:detectives] 
                (fn [detectives]
-                 (map (fn [d] (assoc d :moved? false)) detectives)))
+                 (->> detectives
+                      (map (fn [d] (assoc d :moved? false)))
+                      vec)))
     (assoc-in x [:mrx :moved?] false)
     (update-in x [:round] inc)))
                          
@@ -204,5 +231,28 @@
 
 
 
+(defn mrx-reveals 
+  ""
+  [game here-i-am]
+  
+  ;; Checks
+  (if (not (mrx-has-to-reveal? game))  
+    (throw (IllegalStateException. 
+            (format "Mr. X has only to reveal his own position after moving in rounds: %s" reveal-in-round))))
+  (check-mrx-responded game)
+  (if (not (contains? (->> game :mrx :positions) here-i-am))  
+    (throw (IllegalStateException. 
+            (format "Mr. X cannot be located at place %s since he has to to at one of the locations %s" here-i-am (->> game :mrx :positions)))))
+    
+  ;; Action
+  (as-> game x 
+    (assoc-in x [:mrx :positions]  #{here-i-am})))
 
-
+(defn next-detective-moves [game]
+  (let [next (whos-turn? game)
+        [i detective] (find-detective game next)]
+    (as-> (map/neighbours-for-detective (:position detective)) x
+      (clojure.set/difference x (detective-positions game))
+      (map (fn [to] (move-detective game (:color detective) to)) x)
+      (strat/sort-games x (:color detective))
+      (first x))))
