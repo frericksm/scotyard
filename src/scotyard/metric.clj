@@ -53,39 +53,101 @@
   [a b]
   (- (count (m-search a b)) 1))
 
-(defn distances-each-to-each [acoll bcoll]
-  (for [a acoll b bcoll] (distance a b)))
 
-(defn distances-to-each
-  "Liefert einen Vector, der für jeden Punkt in coll die Distanz von a enthält"
-  [a coll]
-  (apply min (map #(distance a %) coll)))
 
-(defn next-in-coll
-  "Liefert die Elemente aus coll, die den geringsten Abstand zu a haben"
-  [a coll]
-  (let [min-dist (distances-to-each a coll)]
-    (filter #(= min-dist (distance a %)) coll)))
+(defn distance-matrix 
+  "Returns all distances between the detectives and the possible locations of Mr. X as a map. 
+  Key of a map entry is a vector [color mrx-position] and the value is the distance between the 
+  position of the <color> detective and the possible position <mrx> of Mr. X."
+  [game]
+  (as-> game x
+    (for [d (:detectives x) mrx (get-in x [:mrx :positions])]
+      [[(:color d) mrx]  (distance (:position d) mrx)])
+    (into {} x)))
 
-(defn distance-seq
-  "Returns the distances of each element of acoll to bcoll"
-  [norm-fn acoll bcoll]
-  (norm-fn (map #(distances-to-each % bcoll) acoll)))
+(defn min-seminorm 
+  "Returns the minimum of the absolute (real valued) entries of v"
+  [v]
+  (as-> v x
+    (map (fn [z] (Math/abs z)) x)
+    (reduce min x)))
 
-(defn norm-sum
-  [distance-seq]
-  (apply + distance-seq))
+(defn max-norm [v]
+  "Returns the maximum of the absolute (real valued) entries of v"
+  (as-> v x
+    (map (fn [z] (Math/abs z)) x)
+    (reduce max x)))
 
-(defn norm-nearer-is-important
-  [distance-seq]
-  (->> distance-seq
-       (map #(Math/log10 (+ 1 %)))
-       (norm-sum)
-       ))
+(defn dimension-reduction  
+  "Takes a map as returned by the function distance-matrix and returns a map where only the 
+  the dimenstion at 'dim-index' is kept. Values to the same dimension value are aggregated by 
+  applying the 'norm-fn'"
+  [distance-matrix norm-fn dim-index]
+  (as-> distance-matrix x
+    (reduce (fn [a [dims distance]] 
+              (let [dim (nth dims dim-index)]
+                (update-in a [dim] conj distance)))
+            {} x)
+    (map (fn [[k v]] [k (norm-fn v)]) x)
+    (into {} x)))
 
-(defn nearer?
-  "Returns true, if a1coll is nearer to bcoll than a2coll to bcoll"
-  [a1coll a2coll bcoll]
-  (let [dist-fn (partial distance-seq norm-sum)]
-    (< (dist-fn a1coll bcoll)
-       (dist-fn a2coll bcoll))))
+(defn min-projection 
+  "Calls dimension-reduction with 'min-seminorm' as norm function and dim-index 1 (which is the 
+  dimension of Mr. X's locations)"
+  [distance-matrix]
+  (dimension-reduction distance-matrix min-seminorm 1))
+
+(defn max-projection 
+  "Calls dimension-reduction with 'max-norm' as norm function and dim-index 1 (which is the 
+  dimension of Mr. X's locations)"
+  [distance-matrix]
+  (dimension-reduction distance-matrix max-norm 1))
+
+(defn minmin 
+  "Applies min-seminorm to the result of min-projection"
+  [distance-matrix]
+  (as-> distance-matrix x
+    (min-projection x)
+    (vals x)
+    (min-seminorm x)))
+
+(defn minmax 
+  "Applies max-norm to the result of min-projection"
+  [distance-matrix]
+  (as-> distance-matrix x
+    (min-projection x)
+    (vals x)
+    (max-norm x)))
+
+(defn maxmin 
+  "Applies min-seminorm to the result of max-projection"
+  [distance-matrix]
+  (as-> distance-matrix x
+    (max-projection x)
+    (vals x)
+    (min-seminorm x)))
+
+(defn maxmax 
+  "Applies max-norm to the result of max-projection"
+  [distance-matrix]
+  (as-> distance-matrix x
+    (max-projection x)
+    (vals x)
+    (max-norm x)))
+
+(defn detectives-row-norm 
+  "Select the row of detective-id and applies the norm-fn to that row"
+  [distance-matrix detective-id norm-fn]
+  (as-> distance-matrix x
+    (filter (fn [[[color v]]] (= color detective-id)) x)
+    (dimension-reduction x norm-fn 0)
+    (vals x)
+    (first x)))
+
+
+
+
+
+
+
+
