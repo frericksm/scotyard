@@ -42,8 +42,18 @@
       (sort-by (fn [g] (measure (measure-vector-2 g (:color detective)))) x )
       (first x))))
 
+(defn create-branch-fn [from-game]
+  (let [whosturn (g/whos-turn? from-game)
+        max-round (inc (:round from-game))]
+    (fn [game]
+      (and (not (g/mrx-has-to-reveal? game))
+           (or (not= (:round game) max-round)
+               (not= (g/whos-turn? game) whosturn))))))
+
 (defn branch? [game]
     (< (:round game) 2))
+
+
   
 (defn children 
   "Takes a game and returns "
@@ -57,5 +67,12 @@
         (as-> (map/neighbours-for-detective (:position detective)) x
           (clojure.set/difference x (g/detective-positions game))
           (map (fn [to] (g/move-detective game (:color detective) to)) x)
-          (map (fn [g] (g/mrx-responds g false)) x)
-          )))))
+          (map (fn [g] (g/mrx-responds g false)) x))))))
+
+
+(defn next-steps-all-detectives [g]
+  (let [branch? (create-branch-fn g)]
+    (as-> (tree-seq branch? children g) x
+      (filter (fn [gg] (not (branch? gg))) x)
+      (sort-by (fn [gg] (measure (measure-vector-1 gg))) x)
+      (first x))))
